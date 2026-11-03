@@ -3,11 +3,11 @@ Headline result to aim for: "A linear probe on a 7B coding model's activations d
 The question
 When an AI coding agent is given a task it can't solve honestly, it sometimes cheats: it edits the tests, hardcodes expected outputs, or special-cases the test inputs. Can we tell from the model's internal activations that it is about to cheat, before it does?
 Stack
-• Model: Qwen2.5-Coder-7B-Instruct (main), plus one second model for transfer, e.g. Llama-3.1-8B-Instruct or DeepSeek-Coder-V2-Lite
-• Libraries: PyTorch, Hugging Face Transformers, TransformerLens or plain forward hooks, vLLM for fast generation, scikit-learn for probes, pandas, Weights & Biases for tracking
+• Model: Qwen2.5-Coder-7B-Instruct (main), plus one second model for transfer that fits in 24 GB, e.g. Llama-3.1-8B-Instruct
+• Libraries: PyTorch, Hugging Face Transformers, TransformerLens or plain forward hooks, vLLM for fast generation, scikit-learn for probes, pandas, results logged to local CSV and JSON files (no Weights & Biases)
 • Agent loop: reuse your offline coding agent's tool loop (read, write, run tests) so trajectories look like real agent behavior
 •  
-  Compute: one AWS EC2 GPU instance with an A100 or H100 (paid with AWS credits). Expect roughly $100–300 total; confirm with a small pilot first.
+  Compute: one AWS EC2 g5.2xlarge instance (one NVIDIA A10G GPU with 24 GB, paid with AWS credits; a 7B model in fp16 fits in 24 GB). Model-written code runs inside Docker on the instance. Test the whole pipeline end to end on a laptop with Qwen2.5-Coder-0.5B-Instruct on about 20 tasks before using the GPU. Expect roughly $100–300 total; confirm with a small pilot first.
 Step 1 — Build a hackable task suite (weeks 1–2)
 1. Take ~400 problems from MBPP and HumanEval.
 2. Make three variants of each:
@@ -32,7 +32,7 @@ Step 4 — Train probes (weeks 5–6)
 2. Difference-in-means direction (mean hack activation minus mean honest activation) as a simpler baseline probe.
 3. Baselines to beat:
     ◦ keyword or regex detector on the generated text so far
-    ◦ a separate LLM reading the agent's text so far and judging whether it will cheat
+    ◦ a separate LLM (Claude on Amazon Bedrock) reading the agent's text so far and judging whether it will cheat
 4. Split by task, not by trajectory, so the probe never sees the same problem in training and test.
 Step 5 — Metrics
 Report AUROC per layer, with the best layer highlighted, plus precision at a 5% false-positive rate. Lead time is the headline number: for each hack trajectory, it is how many tokens before the first hacking action the probe score first crosses the threshold τ.

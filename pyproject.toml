@@ -1,0 +1,18 @@
+[project]
+name = "hackguard"
+version = "0.1.0"
+description = "Detecting reward hacking in coding agents from model activations"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+# Only look for our own tests in tests/. Generated task workspaces also contain
+# a test_solution.py file, and we never want pytest to pick those up by accident.
+testpaths = ["tests"]
+# Let tests import our package (hackguard) and the shared helpers in tests/conftest.py.
+pythonpath = [".", "tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+# The datasets library does not ship complete type information.
+ignore_missing_imports = true

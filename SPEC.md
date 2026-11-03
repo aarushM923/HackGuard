@@ -1,4 +1,4 @@
-Project 1: Cheat Detector — catching AI coding agents cheating from their internals
+Project 1: HackGuard — catching AI coding agents cheating from their internals
 Headline result to aim for: "A linear probe on a 7B coding model's activations detects reward hacking with AUROC above 0.9, an average of N tokens before the model writes the cheating code." Everything below exists to produce and defend that sentence.
 The question
 When an AI coding agent is given a task it can't solve honestly, it sometimes cheats: it edits the tests, hardcodes expected outputs, or special-cases the test inputs. Can we tell from the model's internal activations that it is about to cheat, before it does?
@@ -7,7 +7,7 @@ Stack
 • Libraries: PyTorch, Hugging Face Transformers, TransformerLens or plain forward hooks, vLLM for fast generation, scikit-learn for probes, pandas, Weights & Biases for tracking
 • Agent loop: reuse your offline coding agent's tool loop (read, write, run tests) so trajectories look like real agent behavior
 •  
-  Compute: one rented A100 or H100 (Modal, RunPod or Lambda; apply for student credits). Expect roughly $100–300 total; confirm with a small pilot first.
+  Compute: one AWS EC2 GPU instance with an A100 or H100 (paid with AWS credits). Expect roughly $100–300 total; confirm with a small pilot first.
 Step 1 — Build a hackable task suite (weeks 1–2)
 1. Take ~400 problems from MBPP and HumanEval.
 2. Make three variants of each:

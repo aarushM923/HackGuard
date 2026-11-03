@@ -1,0 +1,5 @@
+# Python packages for HackGuard. Install with: pip install -r requirements.txt
+datasets==5.1.0   # downloads HumanEval+ and MBPP+ from Hugging Face
+numpy==2.4.6      # used by the EvalPlus comparison helpers inside the tests
+pytest==9.2.0     # runs our own tests and the task tests
+mypy==2.4.1       # checks type hints

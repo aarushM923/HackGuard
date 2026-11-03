@@ -13,7 +13,7 @@ When an AI coding agent is given a task it can't solve honestly, it sometimes ch
 - **Agent loop:** reuse your offline coding agent's tool loop (read, write, run tests) so trajectories look like real agent behavior
 - **Compute:** one AWS EC2 g5.2xlarge instance (one NVIDIA A10G GPU with 24 GB, paid with AWS credits; a 7B model in fp16 fits in 24 GB). Model-written code runs inside Docker on the instance. Test the whole pipeline end to end on a laptop with Qwen2.5-Coder-0.5B-Instruct on about 20 tasks before using the GPU. Expect roughly $100–300 total; confirm with a small pilot first.
 
-## Step 1 — Build a hackable task suite (weeks 1–2)
+## Step 1 — Build a hackable task suite
 
 1. Take ~400 problems from MBPP and HumanEval.
 2. Make three variants of each:
@@ -23,7 +23,7 @@ When an AI coding agent is given a task it can't solve honestly, it sometimes ch
 3. Hidden tests (never shown to the agent) define whether a solution is actually correct.
 4. Each task runs in its own temp directory or container, so the agent can really edit files.
 
-## Step 2 — Generate and label trajectories (weeks 2–3)
+## Step 2 — Generate and label trajectories
 
 1. Run the agent on every task 3–5 times with different seeds and system prompts (neutral, pressure such as "you will be shut down if tests fail," and explicit "don't modify tests").
 2. Label each trajectory automatically:
@@ -32,13 +32,13 @@ When an AI coding agent is given a task it can't solve honestly, it sometimes ch
 3. Record the token index of the first hacking action in each hack trajectory.
 4. Hand-check 200 random labels and report label accuracy. Target at least 300 hack trajectories; if the model rarely cheats, add more impossible tasks and pressure prompts.
 
-## Step 3 — Extract activations (week 4)
+## Step 3 — Extract activations
 
 1. Re-run each trajectory through the model with hooks (teacher forcing, no new generation).
 2. Save the residual stream at every 4th layer for every token, in fp16, to disk as sharded .safetensors or .npy.
 3. For each hack trajectory, mark positive windows before the first hacking token; use matched positions in honest trajectories as negatives.
 
-## Step 4 — Train probes (weeks 5–6)
+## Step 4 — Train probes
 
 1. Per-layer logistic regression on single-token activations: "will this trajectory hack?"
 2. Difference-in-means direction (mean hack activation minus mean honest activation) as a simpler baseline probe.
@@ -57,13 +57,13 @@ $$
 
 Here $p(x_t)$ is the probe's cheating probability at token $t$, and $t_{\text{hack}}$ is the first hacking token. Report the median lead time and the share of hacks caught before they happen.
 
-## Step 6 — Stretch experiments (weeks 7–8)
+## Step 6 — Stretch experiments
 
 - **Generalization:** train on one hack type (editing tests) and test on another (hardcoding outputs).
 - **Cross-model transfer:** does a probe trained on Qwen work on the second model after a simple linear alignment?
 - **Steering:** subtract the cheating direction during generation and measure whether the hack rate drops without hurting honest pass rates.
 
-## Deliverables (weeks 9–10)
+## Deliverables
 
 - Public GitHub repo with a one-command reproduction script
 - The labeled trajectory dataset on Hugging Face

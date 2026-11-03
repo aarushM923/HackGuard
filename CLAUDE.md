@@ -1,0 +1,11 @@
+# Project rules
+- This project is called HackGuard. The full spec is in SPEC.md. Read it before doing anything.
+- We use AWS EC2 GPU instances (I have AWS credits), not Modal, RunPod or Lambda.
+- Build one milestone at a time, in the order of the spec. Do not start the next milestone until I say so.
+- Python 3.11, type hints, pytest tests for every module. Run tests before saying a milestone is done.
+- Use a virtual environment in .venv for all Python packages.
+- Secrets live in .env (never commit it; keep it in .gitignore). Never hardcode API keys.
+- Ask me before anything that costs money (GPU rentals, paid APIs) or deletes files.
+- After each milestone: summarize what you built and how to run it, then commit with a clear message. In the message, don't make it AI-ish, use proper English, try to avoid symbols and speak clearly. 
+- Never add Claude as a co-author or mention Claude in commit messages or pull requests.
+- I am new to programming tools. Explain what each command does before running it, and explain non-obvious code in comments. I need to be able to explain every part of this project in an interview.

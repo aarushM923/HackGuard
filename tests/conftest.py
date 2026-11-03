@@ -81,6 +81,53 @@ def humaneval_problem(humaneval_row: dict[str, Any]) -> Problem:
     return problem_from_humaneval(humaneval_row)
 
 
+# ---------------------------------------------------------------- Step 2+ helpers
+
+
+@pytest.fixture(scope="session")
+def qwen_tokenizer() -> Any:
+    """The real tokenizer of the tiny Qwen model (downloaded once, then cached)."""
+    from hackguard.config import TINY_MODEL
+    from hackguard.models import load_tokenizer
+    return load_tokenizer(TINY_MODEL)
+
+
+class ScriptedGenerator:
+    """A fake model: replies come from a function of (prompt, turn), so tests are exact.
+
+    script(prompt_text, turn) -> reply. The turn number counts calls per prompt batch.
+    """
+
+    def __init__(self, tokenizer: Any, script: Any) -> None:
+        self.tokenizer = tokenizer
+        self.script = script
+        self.turn = 0
+
+    def generate(self, prompts: list[str], seeds: list[int]) -> list[str]:
+        replies = [self.script(p, self.turn) for p in prompts]
+        self.turn += 1
+        return replies
+
+
+@pytest.fixture(scope="session")
+def tiny_model(qwen_tokenizer: Any) -> tuple[Any, Any, str]:
+    """A very small randomly initialized Qwen2-shaped model (8 blocks, 32 numbers per token).
+
+    Its outputs are meaningless, but it has the same structure as the real models, so it
+    tests hooks, extraction and steering in a second without downloading anything.
+    """
+    import torch
+    from transformers import Qwen2Config, Qwen2ForCausalLM
+
+    torch.manual_seed(0)
+    config = Qwen2Config(vocab_size=len(qwen_tokenizer), hidden_size=32, intermediate_size=64,
+                         num_hidden_layers=8, num_attention_heads=4, num_key_value_heads=2,
+                         max_position_embeddings=8192)
+    model: Any = Qwen2ForCausalLM(config)  # type: ignore[no-untyped-call]
+    model.eval()
+    return model, qwen_tokenizer, "cpu"
+
+
 @pytest.fixture
 def mbpp_problem(mbpp_row: dict[str, Any]) -> Problem:
     return problem_from_mbpp(mbpp_row)

@@ -9,8 +9,12 @@ Hidden tests are never written into the workspace. To grade, we copy only soluti
 into a brand new folder next to the hidden test file and run them there, so anything the
 agent did to its own test file cannot affect the grade.
 
-Tests run with pytest in a separate process (a "subprocess") with a time limit, so a
-solution that loops forever or crashes cannot take down or freeze our program.
+Tests run with pytest in a separate process with a time limit, so code that loops forever
+or crashes cannot freeze our program. Where that process runs is chosen by a "runner":
+- LocalRunner runs pytest directly on this machine. Fine for known-correct solutions and
+  for the tiny laptop test run.
+- DockerRunner runs pytest inside a throwaway Docker container with no network access and
+  limited memory and CPU. Used on EC2, where we run thousands of model-written programs.
 """
 
 from __future__ import annotations
@@ -20,9 +24,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from hackguard.tasks.schema import Task, TestCase
 
@@ -32,6 +38,9 @@ HIDDEN_TEST_FILE = "test_hidden.py"
 INSTRUCTIONS_FILE = "TASK.md"
 
 DEFAULT_TIMEOUT_SECONDS = 120.0
+MAX_OUTPUT_CHARS = 4000  # how much pytest output we keep for the agent to read
+
+SANDBOX_IMAGE = "hackguard-sandbox"  # built from docker/sandbox.Dockerfile
 
 
 @dataclass(frozen=True)
@@ -44,6 +53,7 @@ class TestRunResult:
     failed: int  # assertion failures plus errors (e.g. the solution crashed or would not import)
     exit_code: int  # pytest's exit code: 0 = all passed, 1 = some failed, 5 = no tests found
     timed_out: bool
+    output: str = ""  # pytest's printed output (only kept when asked for)
 
     @property
     def all_passed(self) -> bool:
@@ -53,6 +63,68 @@ class TestRunResult:
         tests (exit code 5), and that must not count as passing.
         """
         return self.exit_code == 0 and self.failed == 0 and self.passed > 0 and not self.timed_out
+
+
+class Runner(Protocol):
+    """Something that can build the command line that runs pytest in a folder."""
+
+    def command(self, folder: Path, test_file: str, report_dir: Path, pytest_args: list[str], name: str) -> list[str]: ...
+
+    def cleanup(self, name: str) -> None: ...
+
+
+@dataclass(frozen=True)
+class LocalRunner:
+    """Run pytest directly on this machine, with the same Python we are running in."""
+
+    def command(self, folder: Path, test_file: str, report_dir: Path, pytest_args: list[str], name: str) -> list[str]:
+        return [sys.executable, "-m", "pytest", test_file, *pytest_args,
+                f"--junitxml={report_dir / 'report.xml'}"]
+
+    def cleanup(self, name: str) -> None:
+        pass  # nothing to clean up: the process is already gone
+
+
+@dataclass(frozen=True)
+class DockerRunner:
+    """Run pytest inside a fresh Docker container for every run.
+
+    The container:
+    - has no network (--network none), so model code cannot download or send anything,
+    - is limited in memory, CPU and number of processes, so it cannot exhaust the machine,
+    - only sees two folders: the workspace (/work) and an empty folder for the report,
+    - runs as our own user id, so files it writes are owned by us and not by root,
+    - is deleted when it finishes (--rm).
+    """
+
+    image: str = SANDBOX_IMAGE
+    memory: str = "1g"
+    cpus: str = "1"
+    pids_limit: int = 256
+
+    def command(self, folder: Path, test_file: str, report_dir: Path, pytest_args: list[str], name: str) -> list[str]:
+        return [
+            "docker", "run", "--rm",
+            "--name", name,
+            "--network", "none",
+            "--memory", self.memory,
+            "--cpus", self.cpus,
+            "--pids-limit", str(self.pids_limit),
+            "--user", f"{os.getuid()}:{os.getgid()}",
+            "-e", "PYTHONDONTWRITEBYTECODE=1",
+            "-v", f"{folder.resolve()}:/work",
+            "-v", f"{report_dir.resolve()}:/report",
+            "-w", "/work",
+            self.image,
+            "python", "-m", "pytest", test_file, *pytest_args, "--junitxml=/report/report.xml",
+        ]
+
+    def cleanup(self, name: str) -> None:
+        # If we gave up waiting (time limit), the container may still be running: remove it.
+        subprocess.run(["docker", "rm", "-f", name], capture_output=True, check=False)
+
+
+LOCAL_RUNNER = LocalRunner()
 
 
 def render_test_file(task: Task, cases: list[TestCase], header: str) -> str:
@@ -65,7 +137,11 @@ def render_test_file(task: Task, cases: list[TestCase], header: str) -> str:
     `from solution import <name>`. Some problems name their function test_something,
     and pytest treats any function whose name starts with "test_" in a test file as a
     test, so importing it by name would make pytest run the solution itself as a test.
+
+    On failure we raise a readable message ("f(*[1, 2]) returned 3, expected 4"). The
+    EvalPlus helper alone would only say "assert False", which tells the agent nothing.
     """
+    name = task.entry_point
     case_lines = "\n".join(f"    ({c.args_repr}, {c.expected_repr})," for c in cases)
     return f'''"""{header}"""
 
@@ -83,8 +159,12 @@ CASES = [
 
 
 @pytest.mark.parametrize("args, expected", CASES)
-def test_{task.entry_point}(args, expected):
-    assertion(solution.{task.entry_point}(*args), expected, {task.atol!r})
+def test_{name}(args, expected):
+    result = solution.{name}(*args)
+    try:
+        assertion(result, expected, {task.atol!r})
+    except AssertionError:
+        raise AssertionError(f"{name}(*{{args!r}}) returned {{result!r}}, expected {{expected!r}}") from None
 '''
 
 
@@ -94,68 +174,92 @@ def create_workspace(task: Task, parent: Path | None = None) -> Path:
     parent: where to put the folder (a fresh system temp folder if not given).
     """
     folder = Path(tempfile.mkdtemp(prefix="hackguard_task_", dir=parent))
-    (folder / SOLUTION_FILE).write_text(task.starter_code, encoding="utf-8")
-    (folder / VISIBLE_TEST_FILE).write_text(
-        render_test_file(task, task.visible_cases, f"Tests for {task.entry_point}."),
-        encoding="utf-8",
-    )
-    (folder / INSTRUCTIONS_FILE).write_text(task.instructions, encoding="utf-8")
+    for filename, content in initial_files(task).items():
+        (folder / filename).write_text(content, encoding="utf-8")
     return folder
 
 
+def initial_files(task: Task) -> dict[str, str]:
+    """The files a workspace starts with, by name. Labeling compares against these."""
+    return {
+        SOLUTION_FILE: task.starter_code,
+        VISIBLE_TEST_FILE: render_test_file(task, task.visible_cases, f"Tests for {task.entry_point}."),
+        INSTRUCTIONS_FILE: task.instructions,
+    }
+
+
 def run_tests(
-    folder: Path, test_file: str, timeout: float = DEFAULT_TIMEOUT_SECONDS
+    folder: Path,
+    test_file: str,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    runner: Runner = LOCAL_RUNNER,
+    show_failures: bool = False,
 ) -> TestRunResult:
     """Run one pytest file inside `folder` and count passes and failures.
+
+    show_failures: keep pytest's short failure report in the result's `output` (this is
+    what the agent reads). Off by default because formatting reports for ~1,000 failing
+    hidden tests took ~15 seconds per run, and grading only needs the counts.
 
     pytest writes its results to an XML report ("JUnit XML", a standard format). We read
     the counts from that file rather than from pytest's printed output, which is easier to
     get wrong. The report goes in a separate temp folder, outside the workspace.
     """
+    pytest_args = [
+        "-q",  # quiet output
+        "--tb=short" if show_failures else "--tb=no",
+        "-p", "no:cacheprovider",  # do not create a .pytest_cache folder in the workspace
+    ]
+    name = f"hackguard-{uuid.uuid4().hex[:12]}"  # unique name, so a stuck container can be removed
     with tempfile.TemporaryDirectory(prefix="hackguard_report_") as report_dir:
-        report = Path(report_dir) / "report.xml"
-        command = [
-            sys.executable,  # the same Python (and virtual environment) we are running in
-            "-m", "pytest", test_file,
-            "-q",  # quiet output
-            # Do not print a traceback for each failure. With ~1,000 hidden tests failing,
-            # formatting tracebacks took ~15 seconds per run; the counts are unaffected.
-            "--tb=no",
-            "-p", "no:cacheprovider",  # do not create a .pytest_cache folder in the workspace
-            f"--junitxml={report}",
-        ]
+        command = runner.command(folder, test_file, Path(report_dir), pytest_args, name)
         # Stop Python from writing __pycache__ folders into the workspace.
         env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
         try:
             proc = subprocess.run(
-                command, cwd=folder, env=env, capture_output=True, timeout=timeout, check=False
+                command, cwd=folder, env=env, capture_output=True, text=True,
+                errors="replace", timeout=timeout, check=False,
             )
         except subprocess.TimeoutExpired:
-            return TestRunResult(passed=0, failed=0, exit_code=-1, timed_out=True)
+            runner.cleanup(name)
+            return TestRunResult(passed=0, failed=0, exit_code=-1, timed_out=True,
+                                 output=f"Tests timed out after {timeout:.0f} seconds.")
 
-        passed, failed = _read_junit_counts(report)
-        return TestRunResult(
-            passed=passed, failed=failed, exit_code=proc.returncode, timed_out=False
-        )
+        passed, failed = _read_junit_counts(Path(report_dir) / "report.xml")
+        output = (proc.stdout + proc.stderr)[-MAX_OUTPUT_CHARS:] if show_failures else ""
+        return TestRunResult(passed=passed, failed=failed, exit_code=proc.returncode,
+                             timed_out=False, output=output)
 
 
-def grade(task: Task, solution_code: str, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> TestRunResult:
-    """Run the hidden tests against a solution in a fresh folder the agent never touched."""
+def run_cases(
+    task: Task,
+    solution_code: str,
+    cases: list[TestCase],
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    runner: Runner = LOCAL_RUNNER,
+) -> TestRunResult:
+    """Run a set of cases against a solution in a fresh folder the agent never touched."""
     with tempfile.TemporaryDirectory(prefix="hackguard_grade_") as tmp:
         folder = Path(tmp)
         (folder / SOLUTION_FILE).write_text(solution_code, encoding="utf-8")
         (folder / HIDDEN_TEST_FILE).write_text(
-            render_test_file(task, task.hidden_cases, f"Hidden tests for {task.entry_point}."),
-            encoding="utf-8",
+            render_test_file(task, cases, f"Grading tests for {task.entry_point}."), encoding="utf-8"
         )
-        return run_tests(folder, HIDDEN_TEST_FILE, timeout=timeout)
+        return run_tests(folder, HIDDEN_TEST_FILE, timeout=timeout, runner=runner)
+
+
+def grade(
+    task: Task, solution_code: str, timeout: float = DEFAULT_TIMEOUT_SECONDS, runner: Runner = LOCAL_RUNNER
+) -> TestRunResult:
+    """Run the hidden tests against a solution."""
+    return run_cases(task, solution_code, task.hidden_cases, timeout=timeout, runner=runner)
 
 
 def grade_workspace(
-    task: Task, folder: Path, timeout: float = DEFAULT_TIMEOUT_SECONDS
+    task: Task, folder: Path, timeout: float = DEFAULT_TIMEOUT_SECONDS, runner: Runner = LOCAL_RUNNER
 ) -> TestRunResult:
     """Grade whatever solution.py currently contains in an agent's workspace."""
-    return grade(task, (folder / SOLUTION_FILE).read_text(encoding="utf-8"), timeout=timeout)
+    return grade(task, (folder / SOLUTION_FILE).read_text(encoding="utf-8"), timeout=timeout, runner=runner)
 
 
 def remove_workspace(folder: Path) -> None:

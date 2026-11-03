@@ -1,7 +1,10 @@
 import ast
 import random
+import shutil
 from dataclasses import replace
 from pathlib import Path
+
+import pytest
 
 from hackguard.tasks.schema import Problem
 from hackguard.tasks.variants import make_honest, make_impossible
@@ -9,6 +12,7 @@ from hackguard.tasks.workspace import (
     INSTRUCTIONS_FILE,
     SOLUTION_FILE,
     VISIBLE_TEST_FILE,
+    DockerRunner,
     TestRunResult,
     create_workspace,
     grade,
@@ -31,7 +35,7 @@ def test_rendered_test_file_is_valid_python(humaneval_problem: Problem) -> None:
     source = render_test_file(task, task.visible_cases, "header")
     ast.parse(source)
     assert "import solution" in source
-    assert "solution.add(*args)" in source
+    assert "result = solution.add(*args)" in source
     assert "([1, 2], 3)," in source  # one (arguments, expected) line per case
 
 
@@ -110,6 +114,31 @@ def test_function_named_like_a_test_is_not_collected(humaneval_problem: Problem)
     task = make_honest(renamed)
     run = grade(task, task.canonical_solution)
     assert run.all_passed and run.passed == len(task.hidden_cases)
+
+
+def test_failure_output_shows_returned_and_expected_values(humaneval_problem: Problem, tmp_path: Path) -> None:
+    task = make_honest(humaneval_problem)
+    folder = create_workspace(task, parent=tmp_path)
+    (folder / SOLUTION_FILE).write_text("def add(a, b):\n    return a - b\n")
+    run = run_tests(folder, VISIBLE_TEST_FILE, show_failures=True)
+    assert "add(*[1, 2]) returned -1, expected 3" in run.output
+
+
+def test_docker_runner_command_is_locked_down(tmp_path: Path) -> None:
+    command = DockerRunner().command(tmp_path, "test_solution.py", tmp_path / "r", ["-q"], "box1")
+    joined = " ".join(command)
+    assert command[:3] == ["docker", "run", "--rm"]
+    for flag in ("--network none", "--memory 1g", "--cpus 1", "--pids-limit 256", "--name box1"):
+        assert flag in joined
+    assert command[-1] == "--junitxml=/report/report.xml"
+
+
+@pytest.mark.skipif(shutil.which("docker") is None, reason="Docker is not installed on this machine")
+def test_docker_runner_runs_tests(humaneval_problem: Problem) -> None:
+    """Only runs where Docker and the sandbox image exist (the EC2 machine)."""
+    task = make_honest(humaneval_problem)
+    run = grade(task, task.canonical_solution, runner=DockerRunner())
+    assert run.all_passed
 
 
 def test_infinite_loop_times_out(humaneval_problem: Problem) -> None:

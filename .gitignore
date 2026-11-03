@@ -4,3 +4,7 @@ __pycache__/
 data/
 *.npy
 *.safetensors
+runs/
+.hackguard_instance.json
+.mypy_cache/
+.pytest_cache/

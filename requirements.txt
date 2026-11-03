@@ -1,5 +1,17 @@
-# Python packages for HackGuard. Install with: pip install -r requirements.txt
-datasets==5.1.0   # downloads HumanEval+ and MBPP+ from Hugging Face
-numpy==2.4.6      # used by the EvalPlus comparison helpers inside the tests
-pytest==9.2.0     # runs our own tests and the task tests
-mypy==2.4.1       # checks type hints
+# Python packages shared by the laptop and the GPU machine.
+# Do not install this file directly; install requirements-laptop.txt or requirements-gpu.txt,
+# which add the right PyTorch setup for each machine.
+datasets==5.1.0          # downloads HumanEval+ and MBPP+ from Hugging Face
+numpy==2.4.6             # arrays; also used by the EvalPlus comparison helpers in the tests
+pytest==9.2.0            # runs our own tests and the task tests
+mypy==2.4.1              # checks type hints
+transformers==5.20.2     # loads the language models (must stay below 5.21 for vLLM 0.33)
+accelerate==1.15.0       # helps transformers place large models on the GPU
+safetensors==0.8.0       # safe, fast file format for saving activations
+huggingface_hub==2.4.0   # model downloads (and the Hugging Face login token)
+scikit-learn==1.9.1      # logistic regression probes and AUROC
+pandas==3.1.0            # tables of results
+matplotlib==3.11.2       # charts (AUROC by layer, lead time histogram)
+anthropic[bedrock]==2.4.0  # Claude on Amazon Bedrock for the LLM judge baseline
+boto3==1.43.123          # AWS from Python: launching and stopping the EC2 machine
+python-dotenv==1.2.4     # reads secrets from the .env file

@@ -1,3 +1,4 @@
+import pandas as pd
 import math
 
 import numpy as np
@@ -10,7 +11,7 @@ from hackguard.probes.metrics import (
     precision_at_fpr,
     trajectory_threshold,
 )
-from hackguard.probes.splits import split_problems
+from hackguard.probes.splits import sample_splits, split_problems
 
 
 def test_auroc_basics() -> None:
@@ -56,3 +57,14 @@ def test_split_by_problem_is_stable_and_complete() -> None:
     assert split == split_problems(list(reversed(ids)), seed=0)  # order does not matter
     counts = {name: list(split.values()).count(name) for name in ("train", "val", "test")}
     assert counts == {"train": 60, "val": 20, "test": 20}
+
+
+def test_stratified_split_puts_hack_problems_in_every_split() -> None:
+    # 30 problems, only 5 with a hack: a plain random cut often leaves val or test without one.
+    rows = [{"problem_id": f"P/{i}", "label": int(i < 5)} for i in range(30)]
+    samples = pd.DataFrame(rows + rows)  # repeated rows (several samples per problem) are fine
+    split = sample_splits(samples, seed=0)
+    assert len(split) == 30
+    for name in ("train", "val", "test"):
+        assert any(split[f"P/{i}"] == name for i in range(5)), name
+    assert split == sample_splits(samples.iloc[::-1], seed=0)  # order does not matter

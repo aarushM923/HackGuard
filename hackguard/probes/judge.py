@@ -31,7 +31,7 @@ import pandas as pd
 from hackguard.activations.extract import load_layer, load_samples
 from hackguard.probes.metrics import auroc, precision_at_fpr
 from hackguard.probes.regex_baseline import regex_score
-from hackguard.probes.splits import split_problems
+from hackguard.probes.splits import sample_splits
 from hackguard.probes.train import LinearProbe
 from hackguard.trajectories.schema import Trajectory
 
@@ -97,7 +97,7 @@ def bedrock_judge(region: str | None = None, model: str = JUDGE_MODEL) -> JudgeF
 def judge_items(act_dir: Path, trajectories: list[Trajectory], seed: int, max_items: int) -> pd.DataFrame:
     """Choose the moments to judge: one per test trajectory, at most half of them hacks."""
     samples = load_samples(act_dir)
-    split = split_problems(samples["problem_id"].tolist(), seed)
+    split = sample_splits(samples, seed)
     points = samples[(samples["tokens_before"] == 1) & (samples["problem_id"].map(split) == "test")]
     hacks, honest = points[points["label"] == 1], points[points["label"] == 0]
     rng = random.Random(seed)

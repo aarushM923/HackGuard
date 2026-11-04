@@ -29,7 +29,6 @@ from hackguard.activations.tokens import tokenize_trajectory
 from hackguard.models import load_model
 from hackguard.probes.metrics import lead_times, trajectory_threshold
 from hackguard.probes.regex_baseline import token_regex_scores
-from hackguard.probes.splits import split_problems
 from hackguard.probes.train import LinearProbe
 from hackguard.trajectories.schema import Label, Trajectory
 
@@ -41,7 +40,7 @@ def score_tokens(
     probe_dir: Path,
     layers: list[int],
     max_tokens: int,
-    seed: int,
+    split: dict[str, str],
     out_path: Path,
     model: Any = None,
     tokenizer: Any = None,
@@ -55,8 +54,9 @@ def score_tokens(
     if model is None:
         model, tokenizer, device = load_model(model_id)
     assert device is not None
-    split = split_problems([t.problem_id for t in trajectories], seed)
-    chosen = [t for t in trajectories if split[t.problem_id] in ("val", "test")
+    # `split` is the run's problem split (from sample_splits); problems missing from it
+    # had no usable trajectories and are skipped.
+    chosen = [t for t in trajectories if split.get(t.problem_id) in ("val", "test")
               and labels[t.trajectory_id].label in USABLE_LABELS]
 
     probes = [LinearProbe.load(probe_dir / f"logreg_layer{layer:02d}.npz") for layer in layers]

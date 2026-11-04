@@ -18,7 +18,7 @@ Steps, in order:
     steering        Step 6: subtract the cheating direction while generating
     report          collect everything into report.md and charts
     audit-score     after filling in audit_sheet.csv by hand: compute label accuracy
-    judge           Step 4, on the laptop: add the paid Claude-on-Bedrock judge (needs --confirm-spend)
+    judge           Step 4, on the laptop: add the paid LLM judge on Amazon Bedrock (needs --confirm-spend)
 
 `all` runs each step as a separate process. On the GPU that matters: vLLM keeps its GPU
 memory until its process ends, and later steps need that memory for transformers.
@@ -90,12 +90,14 @@ def run_step(step: str, cfg: RunConfig, args: argparse.Namespace) -> None:
         train_all_layers(act_main, probe_dir, results, cfg.seed)
 
     elif step == "leadtime":
-        from hackguard.activations.extract import load_meta
+        from hackguard.activations.extract import load_meta, load_samples
         from hackguard.probes.lead_time import lead_time_report, score_tokens
+        from hackguard.probes.splits import sample_splits
         from hackguard.probes.train import best_layer
         trajectories, labels = _load(cfg)
+        split = sample_splits(load_samples(act_main), cfg.seed)
         scores = score_tokens(trajectories, labels, cfg.model, probe_dir, load_meta(act_main)["layers"],
-                              cfg.max_context_tokens + 2048, cfg.seed, results / "token_scores.npz")
+                              cfg.max_context_tokens + 2048, split, results / "token_scores.npz")
         print(lead_time_report(scores, results, best_layer(results)))
 
     elif step == "baselines":

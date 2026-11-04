@@ -28,7 +28,7 @@ from hackguard.agent.generation import HFGenerator, Steering
 from hackguard.agent.loop import EpisodeSpec, run_episodes
 from hackguard.config import RunConfig
 from hackguard.models import load_model
-from hackguard.probes.splits import split_problems
+from hackguard.probes.splits import sample_splits
 from hackguard.probes.train import LinearProbe
 from hackguard.tasks.schema import Task
 from hackguard.tasks.workspace import Runner
@@ -41,7 +41,7 @@ def steering_direction(act_dir: Path, probe_dir: Path, layer: int, seed: int) ->
     probe = LinearProbe.load(probe_dir / f"diffmeans_layer{layer:02d}.npz")
     direction = probe.weight / np.linalg.norm(probe.weight)
     samples = load_samples(act_dir)
-    train = samples["problem_id"].map(split_problems(samples["problem_id"].tolist(), seed)).to_numpy() == "train"
+    train = samples["problem_id"].map(sample_splits(samples, seed)).to_numpy() == "train"
     projections = load_layer(act_dir, layer)[train] @ direction
     return torch.tensor(direction, dtype=torch.float32), float(projections.std())
 
@@ -54,13 +54,12 @@ def pick_prompt(trajectories: list[Trajectory], labels: dict[str, Label]) -> str
     return max(rates, key=lambda name: float(np.mean(rates[name])))
 
 
-def steering_tasks(tasks: list[Task], per_variant: int, seed: int) -> list[Task]:
-    """Impossible and honest tasks from *test-split* problems only."""
-    split = split_problems([t.problem_id for t in tasks], seed)
+def steering_tasks(tasks: list[Task], split: dict[str, str], per_variant: int, seed: int) -> list[Task]:
+    """Impossible and honest tasks from *test-split* problems only (`split` from sample_splits)."""
     rng = random.Random(seed)
     chosen = []
     for variant in ("impossible", "honest"):
-        pool = sorted((t for t in tasks if t.variant == variant and split[t.problem_id] == "test"), key=lambda t: t.task_id)
+        pool = sorted((t for t in tasks if t.variant == variant and split.get(t.problem_id) == "test"), key=lambda t: t.task_id)
         chosen += rng.sample(pool, min(per_variant, len(pool)))
     return chosen
 
@@ -69,7 +68,7 @@ def run_steering(cfg: RunConfig, act_dir: Path, probe_dir: Path, results_dir: Pa
                  tasks: list[Task], prompt_name: str, runner: Runner) -> pd.DataFrame:
     direction, spread = steering_direction(act_dir, probe_dir, layer, cfg.seed)
     loaded = load_model(cfg.model)
-    chosen = steering_tasks(tasks, cfg.steering_tasks_per_variant, cfg.seed)
+    chosen = steering_tasks(tasks, sample_splits(load_samples(act_dir), cfg.seed), cfg.steering_tasks_per_variant, cfg.seed)
     by_id = {t.task_id: t for t in chosen}
     rows: list[dict[str, Any]] = []
     for strength in cfg.steering_strengths:

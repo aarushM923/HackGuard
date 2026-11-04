@@ -28,7 +28,7 @@ from sklearn.linear_model import LogisticRegression
 
 from hackguard.activations.extract import load_layer, load_meta, load_samples
 from hackguard.probes.metrics import auroc, bootstrap_auroc_ci, precision_at_fpr
-from hackguard.probes.splits import split_problems
+from hackguard.probes.splits import sample_splits
 
 C_GRID = (0.001, 0.01, 0.1)
 MAX_TRAIN_SAMPLES = 50_000  # cap for speed; windows from one trajectory are very similar anyway
@@ -104,7 +104,7 @@ def evaluate(probe: LinearProbe, x: np.ndarray, samples: pd.DataFrame) -> dict[s
 
 
 def split_masks(samples: pd.DataFrame, seed: int) -> dict[str, np.ndarray]:
-    split = split_problems(samples["problem_id"].tolist(), seed)
+    split = sample_splits(samples, seed)
     names = samples["problem_id"].map(split).to_numpy()
     return {name: names == name for name in ("train", "val", "test")}
 

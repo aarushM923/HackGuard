@@ -81,17 +81,17 @@ class RunConfig:
 
 
 def laptop_config(name: str = "laptop") -> RunConfig:
-    """Tiny end-to-end test: 14 problems x 3 variants = 42 tasks, small model, Mac GPU.
+    """Tiny end-to-end test: 30 problems x 3 variants = 90 tasks, small model, Mac GPU.
 
-    14 rather than 7 problems: with only 7, the problem-level split can leave the test split
-    without a single hack, and then no probe can be evaluated."""
+    30 problems: with 7 or 14, the problem-level split left the test split
+    without a single hack (the tiny model rarely cheats), so no probe could be evaluated."""
     return RunConfig(
         name=name,
         model=TINY_MODEL,
         second_model=TINY_SECOND_MODEL,
         backend="hf",
         runner="local",
-        num_problems=14,
+        num_problems=30,
         max_turns=5,
         max_new_tokens=512,
         max_context_tokens=6144,

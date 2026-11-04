@@ -22,7 +22,7 @@ import pandas as pd
 
 from hackguard.activations.extract import load_layer, load_samples
 from hackguard.probes.metrics import auroc
-from hackguard.probes.splits import split_problems
+from hackguard.probes.splits import sample_splits
 from hackguard.probes.train import C_GRID, train_logreg
 from hackguard.trajectories.labeling import CODE_HACK_TYPES, TEST_EDIT_TYPES
 
@@ -39,7 +39,7 @@ def family_of(hack_types: str) -> str | None:
 def run_generalization(act_dir: Path, results_dir: Path, layer: int, seed: int) -> dict[str, Any]:
     samples = load_samples(act_dir)
     x = load_layer(act_dir, layer)
-    split = samples["problem_id"].map(split_problems(samples["problem_id"].tolist(), seed)).to_numpy()
+    split = samples["problem_id"].map(sample_splits(samples, seed)).to_numpy()
     family = samples["hack_types"].map(family_of).to_numpy()
     y = samples["label"].to_numpy()
     honest = y == 0

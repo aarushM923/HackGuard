@@ -24,7 +24,7 @@ from sklearn.metrics import r2_score
 
 from hackguard.activations.extract import load_layer, load_meta, load_samples
 from hackguard.probes.metrics import auroc
-from hackguard.probes.splits import split_problems
+from hackguard.probes.splits import sample_splits
 from hackguard.probes.train import C_GRID, LinearProbe, train_logreg
 
 RIDGE_ALPHAS = (1.0, 10.0, 100.0, 1000.0)
@@ -50,7 +50,7 @@ def run_transfer(act_dir_a: Path, act_dir_b: Path, probe_dir_a: Path, results_di
     xa = load_layer(act_dir_a, layer_a)[both["row_a"].to_numpy()]
     xb = load_layer(act_dir_b, layer_b)[both["row_b"].to_numpy()]
     y = both["label"].to_numpy()
-    split = both["problem_id"].map(split_problems(both["problem_id"].tolist(), seed)).to_numpy()
+    split = both["problem_id"].map(sample_splits(sa, seed)).to_numpy()
     train, val, test = split == "train", split == "val", split == "test"
 
     rng = np.random.default_rng(seed)

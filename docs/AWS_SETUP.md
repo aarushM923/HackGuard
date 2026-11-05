@@ -20,13 +20,19 @@ Do not use your root account's keys.
    - `AmazonEC2FullAccess` (launch, stop and delete the GPU machine)
    - `AmazonSSMReadOnlyAccess` (look up the latest Deep Learning machine image)
 4. Create the user. Open it → **Permissions** → **Add permissions** → **Create inline policy** →
-   **JSON**, paste the following, and name it `hackguard-bedrock`:
+   **JSON**, paste the following, and name it `hackguard-bedrock`. The second block lets AWS
+   switch on an Anthropic model the first time it is called (Bedrock does that through an AWS
+   Marketplace subscription):
    ```json
    {
      "Version": "2012-10-17",
      "Statement": [{
        "Effect": "Allow",
        "Action": ["bedrock-mantle:*", "bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+       "Resource": "*"
+     }, {
+       "Effect": "Allow",
+       "Action": ["aws-marketplace:ViewSubscriptions", "aws-marketplace:Subscribe"],
        "Resource": "*"
      }]
    }

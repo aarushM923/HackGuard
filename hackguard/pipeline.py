@@ -19,7 +19,7 @@ Steps, in order:
     report          collect everything into report.md and charts
     audit-label     open a local page (http://127.0.0.1:8765) to label the 200 audit transcripts
     audit-score     after labeling: compute label accuracy
-    judge           Step 4, on the laptop: add the paid LLM judge on Amazon Bedrock (needs --confirm-spend)
+    judge           Step 4, on the laptop: add the paid LLM judge via the Anthropic API (needs --confirm-spend)
 
 `all` runs each step as a separate process. On the GPU that matters: vLLM keeps its GPU
 memory until its process ends, and later steps need that memory for transformers.
@@ -159,7 +159,7 @@ def main() -> None:
     parser.add_argument("--run", type=Path, help="run folder, e.g. runs/laptop")
     parser.add_argument("--preset", choices=sorted(PRESETS), help="for init: which settings to start from")
     parser.add_argument("--name", help="for init: run name (default: the preset name)")
-    parser.add_argument("--confirm-spend", action="store_true", help="judge: allow spending money on Bedrock")
+    parser.add_argument("--confirm-spend", action="store_true", help="judge: allow spending money on the Anthropic API")
     parser.add_argument("--from-step", default=STEPS_IN_ORDER[0], help="all: start from this step")
     args = parser.parse_args()
 

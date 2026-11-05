@@ -7,7 +7,7 @@ Detecting when AI coding agents are about to cheat on tests (reward hacking) by 
 - Runs an open-source coding model (Qwen2.5-Coder-7B) as an agent and labels which runs cheat
 - Trains linear probes on the model's activations to predict cheating before it happens
 - Measures detection accuracy (AUROC) and how many tokens of warning the probe gives
-- Compares the probe with a keyword detector and with Claude (on Amazon Bedrock) reading the transcript
+- Compares the probe with a keyword detector and with Claude Opus 5.5 (through the Anthropic API) reading the transcript
 - Stretch experiments: generalization across hack types, transfer to a second model, and steering
 
 ## Setup

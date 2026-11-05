@@ -11,7 +11,7 @@ GPU quota of 8 vCPUs fits exactly one of these.
 
 ### 1.1 Create a user for the laptop
 
-The laptop needs its own AWS login key so the scripts can launch the machine and call Bedrock.
+The laptop needs its own AWS login key so the scripts can launch and stop the GPU machine.
 Do not use your root account's keys.
 
 1. Sign in to the AWS console. Open **IAM** → **Users** → **Create user**.
@@ -19,25 +19,10 @@ Do not use your root account's keys.
 3. Choose **Attach policies directly** and tick:
    - `AmazonEC2FullAccess` (launch, stop and delete the GPU machine)
    - `AmazonSSMReadOnlyAccess` (look up the latest Deep Learning machine image)
-4. Create the user. Open it → **Permissions** → **Add permissions** → **Create inline policy** →
-   **JSON**, paste the following, and name it `hackguard-bedrock`. The second block lets AWS
-   switch on an Anthropic model the first time it is called (Bedrock does that through an AWS
-   Marketplace subscription):
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [{
-       "Effect": "Allow",
-       "Action": ["bedrock-mantle:*", "bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-       "Resource": "*"
-     }, {
-       "Effect": "Allow",
-       "Action": ["aws-marketplace:ViewSubscriptions", "aws-marketplace:Subscribe"],
-       "Resource": "*"
-     }]
-   }
-   ```
-5. Open the **Security credentials** tab → **Create access key** → choose "Local code" → create.
+   - `ServiceQuotasReadOnlyAccess` (check the GPU quota from the command line)
+   - `AWSBudgetsReadOnlyAccess` (check the budget alarm from the command line)
+4. Create the user.
+5. Open it → **Security credentials** tab → **Create access key** → choose "Local code" → create.
    Copy both values now (the secret is shown only once).
 
 ### 1.2 Put the keys in `.env`
@@ -48,21 +33,22 @@ In the project folder, create or edit `.env` (it is in `.gitignore`, so it is ne
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
 AWS_REGION=us-east-1
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Use the region where your GPU quota is.
+Use the region where your GPU quota is. `ANTHROPIC_API_KEY` is for the LLM judge (see 1.4).
 
 ### 1.3 Check the GPU quota
 
 Console → **Service Quotas** → **Amazon EC2** → search "Running On-Demand G and VT instances".
 The value for your region must be at least **8**. You said it is 8, which is exactly enough.
 
-### 1.4 Turn on Claude in Bedrock (for the LLM judge)
+### 1.4 Anthropic API key (for the LLM judge)
 
-Console → **Amazon Bedrock** (same region) → **Model access**. Check that **Claude Opus 5.5**
-is available to your account. If AWS asks for a short use-case form the first time you use
-Anthropic models, fill it in (for example: "research on detecting reward hacking in coding
-agents"). Approval is usually immediate.
+The judge baseline calls Claude Opus 5.5 through the Anthropic API. In the Claude Console
+(platform.claude.com) open **API keys** → **Create key**, and put it in `.env` as
+`ANTHROPIC_API_KEY`. The judge is billed to that Anthropic account, not to AWS credits.
+It only runs on the laptop, so the key is never copied to the GPU machine.
 
 ### 1.5 Hugging Face
 
@@ -144,7 +130,7 @@ python -m hackguard.cloud.ec2 start              # only if the watchdog already 
 python -m hackguard.cloud.ec2 pull gpu           # copies runs/gpu (without the large activation files)
 python -m hackguard.cloud.ec2 stop
 python -m hackguard.pipeline judge --run runs/gpu                   # prints the judge's cost estimate, stops
-python -m hackguard.pipeline judge --run runs/gpu --confirm-spend   # (costs money) runs the judge
+python -m hackguard.pipeline judge --run runs/gpu --confirm-spend   # (costs money, Anthropic API) runs the judge
 python -m hackguard.pipeline audit-sample --run runs/gpu            # (already done on the GPU) 200 transcripts
 python -m hackguard.pipeline audit-label --run runs/gpu             # opens a local labeling page
 # go to http://127.0.0.1:8765, label the 200 transcripts (keys h / o / u), then Ctrl-C

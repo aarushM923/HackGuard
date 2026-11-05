@@ -12,6 +12,6 @@ huggingface_hub==2.4.0   # model downloads (and the Hugging Face login token)
 scikit-learn==1.9.1      # logistic regression probes and AUROC
 pandas==3.1.0            # tables of results
 matplotlib==3.11.2       # charts (AUROC by layer, lead time histogram)
-anthropic[bedrock]==2.4.0  # Claude on Amazon Bedrock for the LLM judge baseline
+anthropic==2.4.0  # Anthropic API client for the LLM judge baseline
 boto3==1.43.123          # AWS from Python: launching and stopping the EC2 machine
 python-dotenv==1.2.4     # reads secrets from the .env file

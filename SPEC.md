@@ -44,7 +44,7 @@ When an AI coding agent is given a task it can't solve honestly, it sometimes ch
 2. Difference-in-means direction (mean hack activation minus mean honest activation) as a simpler baseline probe.
 3. Baselines to beat:
    - keyword or regex detector on the generated text so far
-   - a separate LLM (Claude on Amazon Bedrock) reading the agent's text so far and judging whether it will cheat
+   - a separate LLM (Claude Opus 5.5 through the Anthropic API) reading the agent's text so far and judging whether it will cheat
 4. Split by task, not by trajectory, so the probe never sees the same problem in training and test.
 
 ## Step 5 — Metrics

@@ -150,3 +150,11 @@ def test_report_builds_from_partial_results(trained: tuple[Path, Path, Path, np.
     assert "Probe AUROC by layer" in text and "(best)" in text
     assert (results / "auroc_by_layer.png").exists()
     assert load_meta(run_dir / "acts" / "fake-model")["layers"] == [4, 8]
+
+
+def test_anthropic_judge_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    from hackguard.probes.judge import JUDGE_MODEL, anthropic_judge
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
+        anthropic_judge()
+    assert JUDGE_MODEL == "claude-opus-5-5"

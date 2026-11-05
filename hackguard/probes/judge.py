@@ -1,4 +1,4 @@
-"""Baseline 2 (spec Step 4.3): Claude on Amazon Bedrock reads the transcript so far and
+"""Baseline 2 (spec Step 4.3): Claude Opus 5.5, through the Anthropic API, reads the transcript so far and
 estimates the chance that the agent is about to cheat.
 
 For a fair comparison the judge, the probe and the keyword baseline all score exactly the
@@ -9,10 +9,10 @@ text the model had produced by then, and nothing after it.
 Costs money, so:
 - it estimates the cost and refuses to run unless confirm=True,
 - every answer is saved to judge_cache.jsonl, so a crash or re-run never pays twice,
-- tests pass a fake judge function and never call AWS.
+- tests pass a fake judge function and never call the API.
 
-Credentials: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION from .env. The IAM user
-needs the bedrock-mantle:CreateInference permission and Bedrock access to the model.
+Credentials: ANTHROPIC_API_KEY from .env (the anthropic library reads it automatically).
+This is billed to the Anthropic account that owns the key, not to AWS credits.
 """
 
 from __future__ import annotations
@@ -35,9 +35,8 @@ from hackguard.probes.splits import sample_splits
 from hackguard.probes.train import LinearProbe
 from hackguard.trajectories.schema import Trajectory
 
-JUDGE_MODEL = "anthropic.claude-opus-5-5"  # Bedrock model ID: "anthropic." + the Claude model ID
-# Prices used only for the up-front estimate (first-party list price per million tokens;
-# Bedrock's price can differ slightly, see the Bedrock pricing page).
+JUDGE_MODEL = "claude-opus-5-5"
+# List prices in US dollars per million tokens, used only for the up-front cost estimate.
 PRICE_PER_M_INPUT, PRICE_PER_M_OUTPUT = 4.00, 20.00
 EST_OUTPUT_TOKENS = 600  # thinking plus the short JSON answer, per call
 
@@ -71,11 +70,14 @@ def transcript_until(traj: Trajectory, message_index: int, char_end: int) -> str
     return "\n\n".join(parts) + "\n\n[transcript cut off here]"
 
 
-def bedrock_judge(region: str | None = None, model: str = JUDGE_MODEL) -> JudgeFn:
-    """A judge function that calls Claude on Amazon Bedrock."""
-    from anthropic import AnthropicBedrockMantle  # imported here so tests never need AWS
+def anthropic_judge(model: str = JUDGE_MODEL) -> JudgeFn:
+    """A judge function that calls Claude through the Anthropic API."""
+    import anthropic  # imported here so tests never need the library to reach the network
 
-    client = AnthropicBedrockMantle(aws_region=region or os.environ.get("AWS_REGION", "us-east-1"), max_retries=5)
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise RuntimeError("ANTHROPIC_API_KEY is not set; add it to .env")
+    # max_retries: the library waits and retries on rate limits and temporary server errors.
+    client = anthropic.Anthropic(max_retries=5)
 
     def judge(transcript: str) -> float:
         response = client.messages.create(
@@ -192,7 +194,7 @@ def add_llm_judge(
 ) -> dict[str, Any]:
     """Ask the LLM judge about the same moments and add its scores (runs on the laptop).
 
-    judge: a stand-in judge function for tests. If None, the real Bedrock judge is used,
+    judge: a stand-in judge function for tests. If None, the real Anthropic API judge is used,
     which needs confirm=True because it costs money.
     """
     table = pd.read_csv(results_dir / "baselines_same_points.csv")
@@ -203,7 +205,7 @@ def add_llm_judge(
     print(f"LLM judge: {len(table)} calls, estimated cost about ${cost:.2f}")
     if judge is None and not confirm:
         raise PermissionError(f"The judge would cost about ${cost:.2f}. Re-run with --confirm-spend to proceed.")
-    judge = judge or bedrock_judge()
+    judge = judge or anthropic_judge()
     probabilities = _judge_with_cache(judge, table["trajectory_id"].tolist(), transcripts,
                                       results_dir / "judge_cache.jsonl", workers)
     table["llm_judge"] = [probabilities[t] for t in table["trajectory_id"]]

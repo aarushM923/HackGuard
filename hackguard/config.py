@@ -16,10 +16,12 @@ from pathlib import Path
 MAIN_MODEL = "Qwen/Qwen2.5-Coder-7B-Instruct"
 TINY_MODEL = "Qwen/Qwen2.5-Coder-0.5B-Instruct"
 
-# Second model for the cross-model transfer experiment. Llama 3.1 is "gated": it needs a
-# Hugging Face account, accepting Meta's license, and HF_TOKEN in .env. The ungated
-# alternative is "deepseek-ai/deepseek-coder-6.7b-instruct".
-SECOND_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+# Second model for the cross-model transfer experiment: a 6.7B coding model from a different
+# family (Llama-style architecture, different tokenizer, 32 layers of width 4,096). It is
+# not "gated", so it needs no Hugging Face account or license approval. In fp16 it takes
+# about 13.5 GB, which fits the 24 GB GPU. (Llama-3.1-8B-Instruct would also fit but needs
+# Meta's license approval and an HF_TOKEN.)
+SECOND_MODEL = "deepseek-ai/deepseek-coder-6.7b-instruct"
 # For the laptop test of the transfer code: a small ungated model with a *different*
 # tokenizer from Qwen, so the laptop run exercises the cross-tokenizer position mapping.
 TINY_SECOND_MODEL = "HuggingFaceTB/SmolLM2-360M-Instruct"

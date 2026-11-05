@@ -42,10 +42,9 @@ In the project folder, create or edit `.env` (it is in `.gitignore`, so it is ne
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
 AWS_REGION=us-east-1
-HF_TOKEN=hf_...
 ```
 
-Use the region where your GPU quota is. `HF_TOKEN` is only needed for Llama (see 1.5).
+Use the region where your GPU quota is.
 
 ### 1.3 Check the GPU quota
 
@@ -59,15 +58,10 @@ is available to your account. If AWS asks for a short use-case form the first ti
 Anthropic models, fill it in (for example: "research on detecting reward hacking in coding
 agents"). Approval is usually immediate.
 
-### 1.5 Hugging Face token and the Llama license (for the transfer experiment)
+### 1.5 Hugging Face
 
-1. Make a free account at huggingface.co.
-2. Open https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct and accept Meta's license.
-   Approval usually takes minutes to a few hours; the page will say when you have access.
-3. Settings → **Access Tokens** → create a token of type **Read**, and put it in `.env` as `HF_TOKEN`.
-
-If you would rather skip this, set `second_model` to `deepseek-ai/deepseek-coder-6.7b-instruct`
-in `runs/gpu/config.json` after creating it (no account needed).
+Nothing to do. Both models (Qwen2.5-Coder-7B and DeepSeek-Coder-6.7B) download without an
+account or license.
 
 ### 1.6 Set a budget alarm (strongly recommended)
 
@@ -146,7 +140,8 @@ python -m hackguard.cloud.ec2 stop
 python -m hackguard.pipeline judge --run runs/gpu                   # prints the judge's cost estimate, stops
 python -m hackguard.pipeline judge --run runs/gpu --confirm-spend   # (costs money) runs the judge
 python -m hackguard.pipeline audit-sample --run runs/gpu            # (already done on the GPU) 200 transcripts
-# fill in runs/gpu/audit/audit_sheet.csv by hand, then:
+python -m hackguard.pipeline audit-label --run runs/gpu             # opens a local labeling page
+# go to http://127.0.0.1:8765, label the 200 transcripts (keys h / o / u), then Ctrl-C
 python -m hackguard.pipeline audit-score --run runs/gpu
 python -m hackguard.pipeline report --run runs/gpu                  # runs/gpu/report.md
 ```

@@ -8,7 +8,7 @@ When an AI coding agent is given a task it can't solve honestly, it sometimes ch
 
 ## Stack
 
-- **Model:** Qwen2.5-Coder-7B-Instruct (main), plus one second model for transfer that fits in 24 GB, e.g. Llama-3.1-8B-Instruct
+- **Model:** Qwen2.5-Coder-7B-Instruct (main), plus one second model for transfer that fits in 24 GB, DeepSeek-Coder-6.7B-Instruct
 - **Libraries:** PyTorch, Hugging Face Transformers, TransformerLens or plain forward hooks, vLLM for fast generation, scikit-learn for probes, pandas, results logged to local CSV and JSON files (no Weights & Biases)
 - **Agent loop:** reuse your offline coding agent's tool loop (read, write, run tests) so trajectories look like real agent behavior
 - **Compute:** one AWS EC2 g5.2xlarge instance (one NVIDIA A10G GPU with 24 GB, paid with AWS credits; a 7B model in fp16 fits in 24 GB). Model-written code runs inside Docker on the instance. Test the whole pipeline end to end on a laptop with Qwen2.5-Coder-0.5B-Instruct on about 20 tasks before using the GPU. Expect roughly $100–300 total; confirm with a small pilot first.

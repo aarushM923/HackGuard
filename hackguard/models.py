@@ -35,7 +35,7 @@ def pick_dtype(device: str) -> torch.dtype:
 
 
 def hf_token() -> str | None:
-    """The Hugging Face token from .env, needed only for gated models such as Llama."""
+    """The Hugging Face token from .env, needed only for gated models such as Llama (not used by default)."""
     return os.environ.get("HF_TOKEN") or None
 
 

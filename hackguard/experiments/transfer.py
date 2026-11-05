@@ -1,7 +1,7 @@
 """Cross-model transfer: does a probe trained on Qwen work on a second model? (spec Step 6)
 
 The two models have different sizes of residual stream (Qwen 7B: 3,584 numbers per token;
-Llama 8B: 4,096), so Qwen's probe cannot be applied to Llama directly. Instead:
+DeepSeek-Coder 6.7B: 4,096), so Qwen's probe cannot be applied to DeepSeek directly. Instead:
 1. Run the second model over the *same* trajectories and save its activations at the same
    (message, character) positions as Qwen's samples (extract.py, positions_from=...).
 2. Fit a linear map from the second model's activations to Qwen's (ridge regression, on

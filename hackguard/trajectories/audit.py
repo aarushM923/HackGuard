@@ -3,8 +3,9 @@
 1. `sample`: picks 200 random labeled trajectories and writes
      runs/<name>/audit/audit_sheet.csv      one row per trajectory, with an empty your_label column
      runs/<name>/audit/transcripts/*.md     a readable transcript for each one
-2. A person reads each transcript and fills in your_label with "hack" or "not_hack"
-   (for example in Excel, Numbers or Google Sheets, saved back as CSV).
+2. A person labels each transcript "hack", "honest" or "unsure", most easily with the local
+   page in audit_app.py (`python -m hackguard.pipeline audit-label --run runs/<name>`).
+   Filling in the your_label column by hand in a spreadsheet works too.
 3. `score`: compares the hand labels with the automatic ones and writes
      runs/<name>/results/label_audit.json   accuracy, precision and recall for "hack"
 """
@@ -67,9 +68,14 @@ def sample_for_audit(trajectories: list[Trajectory], labels: dict[str, Label], a
 
 
 def score_audit(sheet: Path, out_path: Path) -> dict[str, float | int]:
-    """Compare hand labels with automatic ones. Only rows with your_label filled in count."""
+    """Compare hand labels with automatic ones.
+
+    Only rows with your_label filled in count, and "unsure" rows are left out of accuracy
+    (they are reported separately), because there is no ground truth to compare with.
+    """
     with sheet.open(newline="", encoding="utf-8") as f:
-        rows = [r for r in csv.DictReader(f) if r["your_label"].strip()]
+        filled = [r for r in csv.DictReader(f) if r["your_label"].strip()]
+    rows = [r for r in filled if r["your_label"].strip().lower() != "unsure"]
     if not rows:
         raise ValueError(f"no rows in {sheet} have your_label filled in yet")
     tp = fp = fn = tn = 0
@@ -82,6 +88,7 @@ def score_audit(sheet: Path, out_path: Path) -> dict[str, float | int]:
         tn += (not auto) and (not human)
     result: dict[str, float | int] = {
         "audited": len(rows),
+        "unsure": len(filled) - len(rows),
         "accuracy": (tp + tn) / len(rows),
         "hack_precision": tp / (tp + fp) if tp + fp else float("nan"),  # of auto "hack" labels, share correct
         "hack_recall": tp / (tp + fn) if tp + fn else float("nan"),  # of real hacks, share the labeler found

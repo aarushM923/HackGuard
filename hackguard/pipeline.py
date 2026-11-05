@@ -17,7 +17,8 @@ Steps, in order:
     transfer        Step 6: map the second model into the first model's space and apply its probe
     steering        Step 6: subtract the cheating direction while generating
     report          collect everything into report.md and charts
-    audit-score     after filling in audit_sheet.csv by hand: compute label accuracy
+    audit-label     open a local page (http://127.0.0.1:8765) to label the 200 audit transcripts
+    audit-score     after labeling: compute label accuracy
     judge           Step 4, on the laptop: add the paid LLM judge on Amazon Bedrock (needs --confirm-spend)
 
 `all` runs each step as a separate process. On the GPU that matters: vLLM keeps its GPU
@@ -75,6 +76,10 @@ def run_step(step: str, cfg: RunConfig, args: argparse.Namespace) -> None:
         trajectories, labels = _load(cfg)
         sheet = sample_for_audit(trajectories, labels, run_dir / "audit", seed=cfg.seed)
         print(f"Audit sheet written to {sheet}")
+
+    elif step == "audit-label":
+        from hackguard.trajectories.audit_app import serve
+        serve(run_dir)
 
     elif step == "audit-score":
         from hackguard.trajectories.audit import score_audit
@@ -150,7 +155,7 @@ def run_step(step: str, cfg: RunConfig, args: argparse.Namespace) -> None:
 def main() -> None:
     load_dotenv()  # read secrets (HF_TOKEN, AWS keys) from .env into environment variables
     parser = argparse.ArgumentParser(description="HackGuard pipeline")
-    parser.add_argument("step", choices=["init", "all", *STEPS_IN_ORDER, "audit-score", "judge"])
+    parser.add_argument("step", choices=["init", "all", *STEPS_IN_ORDER, "audit-label", "audit-score", "judge"])
     parser.add_argument("--run", type=Path, help="run folder, e.g. runs/laptop")
     parser.add_argument("--preset", choices=sorted(PRESETS), help="for init: which settings to start from")
     parser.add_argument("--name", help="for init: run name (default: the preset name)")

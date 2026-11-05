@@ -33,7 +33,7 @@ The real experiment runs on an AWS EC2 g5.2xlarge: see [docs/AWS_SETUP.md](docs/
 |---|---|---|
 | 2 | `generate` | Runs the agent on every task x system prompt (neutral, pressure, don't modify tests) |
 | 2 | `label` | Labels each trajectory hack / honest_success / honest_fail / ambiguous, and finds the first hacking token |
-| 2 | `audit-sample`, `audit-score` | 200 random transcripts for a hand check of the labels, then label accuracy |
+| 2 | `audit-sample`, `audit-label`, `audit-score` | 200 random transcripts, a local page to label them (h / o / u keys), then label accuracy |
 | 3 | `extract` | Re-runs trajectories through the model and saves activations at every 4th layer |
 | 4 | `train` | Logistic regression and difference-in-means probes per layer; best layer chosen on validation |
 | 5 | `leadtime` | Scores every token of validation and test trajectories; lead time at a 5% false alarm rate |
@@ -46,7 +46,7 @@ The real experiment runs on an AWS EC2 g5.2xlarge: see [docs/AWS_SETUP.md](docs/
 |---|---|
 | `hackguard/tasks/` | Step 1: the hackable task suite (loading, variants, workspaces, grading) |
 | `hackguard/agent/` | Step 2: prompts, action format, generation backends (transformers, vLLM), agent loop |
-| `hackguard/trajectories/` | Step 2: trajectory records, automatic labeling, hand audit |
+| `hackguard/trajectories/` | Step 2: trajectory records, automatic labeling, hand audit and its labeling page |
 | `hackguard/activations/` | Step 3: tokens and positions, sampling windows, activation extraction |
 | `hackguard/probes/` | Steps 4 and 5: probes, metrics, lead time, keyword and LLM judge baselines |
 | `hackguard/experiments/` | Step 6: generalization, cross-model transfer, steering |

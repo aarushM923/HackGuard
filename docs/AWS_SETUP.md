@@ -26,7 +26,7 @@ Do not use your root account's keys.
      "Version": "2012-10-17",
      "Statement": [{
        "Effect": "Allow",
-       "Action": ["bedrock-mantle:CreateInference", "bedrock:InvokeModel"],
+       "Action": ["bedrock-mantle:*", "bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
        "Resource": "*"
      }]
    }
